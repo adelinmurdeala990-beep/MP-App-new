@@ -1,0 +1,3 @@
+export type Page = 'home' | 'plan' | 'recipes' | 'pantry' | 'shopping' | 'settings'
+const links: { id: Page; label: string; icon: string }[] = [{ id:'home', label:'Acasă', icon:'⌂' },{ id:'plan', label:'Plan', icon:'▦' },{ id:'recipes', label:'Rețete', icon:'◫' },{ id:'pantry', label:'Cămară', icon:'▤' },{ id:'shopping', label:'Cumpărături', icon:'□' },{ id:'settings', label:'Setări', icon:'⚙' }]
+export function Navigation({ page, setPage }: { page: Page; setPage: (page: Page) => void }) { return <nav className="nav">{links.map((link) => <button key={link.id} className={page === link.id ? 'active' : ''} onClick={() => setPage(link.id)}><span>{link.icon}</span>{link.label}</button>)}</nav> }

@@ -1,0 +1,11 @@
+export type Ingredient = { name: string; quantity: number; unit: string }
+export type Recipe = { id: string; name: string; description: string; category: string; image_url: string | null; servings: number; calories: number; protein: number; carbs: number; fat: number; ingredients: Ingredient[]; steps: string[] }
+export type PantryStock = 'low' | 'medium' | 'enough'
+export type PantryItem = { id: string; name: string; stock: PantryStock }
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export type Day = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+export type MealPlanItem = { id: string; day: Day; mealType: MealType; recipeId: string; servings: number }
+export type ShoppingItem = Ingredient & { id: string; checked: boolean; manual: boolean }
+export type CustomShoppingList = { id: string; name: string; items: ShoppingItem[] }
+export type MealPreferences = Record<MealType, boolean>
+export type UserData = { id: string; user_id: string; pantry: PantryItem[]; favorites: string[]; meal_plan: MealPlanItem[]; shopping_list: ShoppingItem[]; custom_lists: CustomShoppingList[]; meal_preferences: MealPreferences }

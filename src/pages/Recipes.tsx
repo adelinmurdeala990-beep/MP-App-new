@@ -1,0 +1,14 @@
+import { useMemo, useState } from 'react'
+import type { Recipe, UserData } from '../types'
+import { RecipeDetail } from '../components/RecipeDetail'
+import { RecipeForm } from '../components/RecipeForm'
+import { EmptyState } from '../components/States'
+
+export function Recipes({ recipes, data, save, reload }: { recipes: Recipe[]; data: UserData; save: (patch: Partial<UserData>) => Promise<boolean>; reload: () => Promise<void> }) {
+  const [query,setQuery] = useState(''); const [category,setCategory] = useState(''); const [ingredients,setIngredients] = useState(''); const [selected,setSelected] = useState<Recipe | null>(null); const [adding, setAdding] = useState(false)
+  const terms = ingredients.split(',').map((value) => value.trim().toLocaleLowerCase('ro')).filter(Boolean)
+  const shown = useMemo(() => recipes.filter((recipe) => (!category || recipe.category === category) && (!query || `${recipe.name} ${recipe.description}`.toLocaleLowerCase('ro').includes(query.toLocaleLowerCase('ro')))).sort((a,b) => terms.reduce((n,term) => n + a.ingredients.filter((ingredient) => ingredient.name.toLocaleLowerCase('ro').includes(term)).length, 0) - terms.reduce((n,term) => n + b.ingredients.filter((ingredient) => ingredient.name.toLocaleLowerCase('ro').includes(term)).length, 0)), [recipes,query,category,ingredients])
+  const categories=[...new Set(recipes.map((recipe) => recipe.category))]
+  const toggle = async (id: string) => { const favorites = data.favorites.includes(id) ? data.favorites.filter((entry) => entry !== id) : [...data.favorites,id]; await save({favorites}) }
+  return <><header className="recipes-header"><div><span className="eyebrow">REȚETE</span><h1>Găsește ceva bun</h1></div><button onClick={() => setAdding(true)}>+ Adaugă rețetă</button></header><div className="filters"><input placeholder="Caută după nume…" value={query} onChange={(event) => setQuery(event.target.value)}/><input placeholder="Ingrediente: ouă, roșii" value={ingredients} onChange={(event) => setIngredients(event.target.value)}/><select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Toate categoriile</option>{categories.map((value) => <option key={value}>{value}</option>)}</select></div><div className="recipe-grid">{shown.length ? shown.map((recipe) => <button className="recipe-card left" onClick={() => setSelected(recipe)} key={recipe.id}><span>{recipe.category}</span><h3>{recipe.name} {data.favorites.includes(recipe.id) && '★'}</h3><p>{recipe.description}</p><small>{recipe.calories} kcal · {recipe.servings} porții</small></button>) : <EmptyState>Nu există încă rețete.</EmptyState>}</div>{selected && <RecipeDetail recipe={selected} favorite={data.favorites.includes(selected.id)} onFavorite={() => void toggle(selected.id)} onClose={() => setSelected(null)}/>} {adding && <RecipeForm onClose={() => setAdding(false)} onSaved={reload}/>}</>
+}
