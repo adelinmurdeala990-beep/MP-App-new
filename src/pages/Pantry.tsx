@@ -1,15 +1,404 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import type { PantryItem, PantryStock, Recipe, UserData } from '../types'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react'
+
+import type {
+  PantryItem,
+  PantryStock,
+  Recipe,
+  UserData,
+} from '../types'
+
 import { EmptyState } from '../components/States'
 
-const catalog = ['Ouă','Lapte','Iaurt','Brânză','Cașcaval','Unt','Piept de pui','Pulpe de pui','Aripi de pui','Carne de porc','Carne de vită','Carne tocată','Pește','Ton','Orez','Paste','Cartofi','Pâine','Roșii','Castraveți','Ardei','Ceapă','Usturoi','Morcovi','Broccoli','Salată verde','Mere','Banane','Ulei de măsline']
-const genericTerms = new Set(['carne', 'pui', 'pește', 'brânză', 'legume', 'fructe'])
-const stockLabels: Record<PantryStock, string> = { low: 'Puțin', medium: 'Mediu', enough: 'Destul' }
+const catalog = [
+  'Ouă',
+  'Lapte',
+  'Iaurt',
+  'Brânză',
+  'Cașcaval',
+  'Unt',
+  'Piept de pui',
+  'Pulpe de pui',
+  'Aripi de pui',
+  'Carne de porc',
+  'Carne de vită',
+  'Carne tocată',
+  'Pește',
+  'Ton',
+  'Orez',
+  'Paste',
+  'Cartofi',
+  'Pâine',
+  'Roșii',
+  'Castraveți',
+  'Ardei',
+  'Ceapă',
+  'Usturoi',
+  'Morcovi',
+  'Broccoli',
+  'Salată verde',
+  'Mere',
+  'Banane',
+  'Ulei de măsline',
+]
 
-export function Pantry({ data, recipes, save }: { data: UserData; recipes: Recipe[]; save: (patch: Partial<UserData>) => Promise<boolean> }) {
-  const [name, setName] = useState(''); const [stock, setStock] = useState<PantryStock>('enough'); const [showSuggestions, setShowSuggestions] = useState(false); const [message, setMessage] = useState<string | null>(null)
-  const suggestions = useMemo(() => { const all = [...new Set([...catalog, ...recipes.flatMap((recipe) => recipe.ingredients.map((item) => item.name))])]; const query = name.trim().toLocaleLowerCase('ro'); return query ? all.filter((item) => item.toLocaleLowerCase('ro').includes(query)).slice(0, 7) : all.slice(0, 7) }, [name, recipes])
-  const add = async (event: FormEvent) => { event.preventDefault(); const value = name.trim(); if (!value) return; if (genericTerms.has(value.toLocaleLowerCase('ro'))) { setMessage('Alege o variantă specifică din sugestii, ca lista să fie corectă.'); setShowSuggestions(true); return }; const existing = data.pantry.find((item) => item.name.toLocaleLowerCase('ro') === value.toLocaleLowerCase('ro')); const pantry = existing ? data.pantry.map((item) => item.id === existing.id ? { ...item, stock } : item) : [...data.pantry, { id: crypto.randomUUID(), name: value, stock }]; await save({ pantry }); setName(''); setStock('enough'); setShowSuggestions(false); setMessage(null) }
-  const changeStock = (id: string, next: PantryStock) => void save({ pantry: data.pantry.map((item) => item.id === id ? { ...item, stock: next } : item) })
-  return <><header><span className="eyebrow">CĂMARĂ</span><h1>Ce ai deja acasă?</h1></header><form className="card pantry-form" onSubmit={add}><label>Ingredient<input placeholder="De exemplu: pui" value={name} onFocus={() => setShowSuggestions(true)} onChange={(event) => { setName(event.target.value); setShowSuggestions(true); setMessage(null) }} required /></label>{showSuggestions && <div className="suggestions">{suggestions.map((item) => <button type="button" key={item} onMouseDown={() => { setName(item); setShowSuggestions(false); setMessage(null) }}>{item}</button>)}</div>}{message && <p className="form-message">{message}</p>}<fieldset><legend>Cât ai?</legend>{(Object.keys(stockLabels) as PantryStock[]).map((value) => <label key={value}><input type="radio" name="stock" checked={stock === value} onChange={() => setStock(value)}/>{stockLabels[value]}</label>)}</fieldset><p className="stock-hint">„Puțin” și „Mediu” rămân pe lista de cumpărături. „Destul” înseamnă că ai suficient pentru planul curent.</p><button>Adaugă în cămară</button></form><section className="card pantry-list">{data.pantry.length ? data.pantry.map((item) => <div key={item.id}><strong>{item.name}</strong><select aria-label={`Stoc ${item.name}`} value={item.stock} onChange={(event) => changeStock(item.id, event.target.value as PantryStock)}>{(Object.keys(stockLabels) as PantryStock[]).map((value) => <option value={value} key={value}>{stockLabels[value]}</option>)}</select><button className="danger" onClick={() => void save({ pantry: data.pantry.filter((entry) => entry.id !== item.id) })}>Șterge</button></div>) : <EmptyState>Cămara este goală.</EmptyState>}</section></>
+const genericTerms = new Set([
+  'carne',
+  'pui',
+  'pește',
+  'brânză',
+  'legume',
+  'fructe',
+])
+
+const stockLabels: Record<
+  PantryStock,
+  string
+> = {
+  low: 'Puțin',
+  medium: 'Mediu',
+  enough: 'Destul',
+}
+
+export function Pantry({
+  data,
+  recipes,
+  save,
+}: {
+  data: UserData
+  recipes: Recipe[]
+  save: (
+    patch: Partial<UserData>
+  ) => Promise<boolean>
+}) {
+  const [name, setName] =
+    useState('')
+
+  const [stock, setStock] =
+    useState<PantryStock>('enough')
+
+  const [showSuggestions, setShowSuggestions] =
+    useState(false)
+
+  const [message, setMessage] =
+    useState<string | null>(null)
+
+  const pantryFormRef =
+    useRef<HTMLFormElement | null>(
+      null
+    )
+
+  useEffect(() => {
+    const handleOutsideClick = (
+      event: MouseEvent
+    ) => {
+      if (
+        pantryFormRef.current &&
+        !pantryFormRef.current.contains(
+          event.target as Node
+        )
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+
+    document.addEventListener(
+      'mousedown',
+      handleOutsideClick
+    )
+
+    return () => {
+      document.removeEventListener(
+        'mousedown',
+        handleOutsideClick
+      )
+    }
+  }, [])
+
+  const suggestions = useMemo(() => {
+    const all = [
+      ...new Set([
+        ...catalog,
+        ...recipes.flatMap(
+          (recipe) =>
+            recipe.ingredients.map(
+              (item) =>
+                item.name
+            )
+        ),
+      ]),
+    ]
+
+    const query =
+      name
+        .trim()
+        .toLocaleLowerCase('ro')
+
+    return query
+      ? all
+          .filter((item) =>
+            item
+              .toLocaleLowerCase('ro')
+              .includes(query)
+          )
+          .slice(0, 7)
+      : all.slice(0, 7)
+  }, [name, recipes])
+
+  const add = async (
+    event: FormEvent
+  ) => {
+    event.preventDefault()
+
+    const value = name.trim()
+
+    if (!value) {
+      return
+    }
+
+    if (
+      genericTerms.has(
+        value.toLocaleLowerCase(
+          'ro'
+        )
+      )
+    ) {
+      setMessage(
+        'Alege o variantă specifică din sugestii, ca lista să fie corectă.'
+      )
+
+      setShowSuggestions(true)
+
+      return
+    }
+
+    const existing =
+      data.pantry.find(
+        (item) =>
+          item.name.toLocaleLowerCase(
+            'ro'
+          ) ===
+          value.toLocaleLowerCase(
+            'ro'
+          )
+      )
+
+    const pantry: PantryItem[] =
+      existing
+        ? data.pantry.map(
+            (item) =>
+              item.id === existing.id
+                ? {
+                    ...item,
+                    stock,
+                  }
+                : item
+          )
+        : [
+            ...data.pantry,
+            {
+              id: crypto.randomUUID(),
+              name: value,
+              stock,
+            },
+          ]
+
+    await save({ pantry })
+
+    setName('')
+    setStock('enough')
+    setShowSuggestions(false)
+    setMessage(null)
+  }
+
+  const changeStock = (
+    id: string,
+    next: PantryStock
+  ) => {
+    void save({
+      pantry: data.pantry.map(
+        (item) =>
+          item.id === id
+            ? {
+                ...item,
+                stock: next,
+              }
+            : item
+      ),
+    })
+  }
+
+  return (
+    <>
+      <header>
+        <span className="eyebrow">
+          CĂMARĂ
+        </span>
+
+        <h1>
+          Ce ai deja acasă?
+        </h1>
+      </header>
+
+      <form
+        ref={pantryFormRef}
+        className="card pantry-form"
+        onSubmit={add}
+      >
+        <label>
+          Ingredient
+
+          <input
+            placeholder="De exemplu: pui"
+            value={name}
+            onFocus={() =>
+              setShowSuggestions(true)
+            }
+            onChange={(event) => {
+              setName(
+                event.target.value
+              )
+              setShowSuggestions(true)
+              setMessage(null)
+            }}
+            required
+          />
+        </label>
+
+        {showSuggestions && (
+          <div className="suggestions">
+            {suggestions.length ? (
+              suggestions.map(
+                (item) => (
+                  <button
+                    type="button"
+                    key={item}
+                    onMouseDown={() => {
+                      setName(item)
+                      setShowSuggestions(
+                        false
+                      )
+                      setMessage(null)
+                    }}
+                  >
+                    {item}
+                  </button>
+                )
+              )
+            ) : (
+              <div className="suggestion-empty">
+                Nu există sugestii.
+              </div>
+            )}
+          </div>
+        )}
+
+        {message && (
+          <p className="form-message">
+            {message}
+          </p>
+        )}
+
+        <fieldset>
+          <legend>
+            Cât ai?
+          </legend>
+
+          {(
+            Object.keys(
+              stockLabels
+            ) as PantryStock[]
+          ).map((value) => (
+            <label key={value}>
+              <input
+                type="radio"
+                name="stock"
+                checked={
+                  stock === value
+                }
+                onChange={() =>
+                  setStock(value)
+                }
+              />
+
+              {stockLabels[value]}
+            </label>
+          ))}
+        </fieldset>
+
+        <p className="stock-hint">
+          „Puțin” și „Mediu” rămân pe
+          lista de cumpărături. „Destul”
+          înseamnă că ai suficient pentru
+          planul curent.
+        </p>
+
+        <button>
+          Adaugă în cămară
+        </button>
+      </form>
+
+      <section className="card pantry-list">
+        {data.pantry.length ? (
+          data.pantry.map((item) => (
+            <div key={item.id}>
+              <strong>
+                {item.name}
+              </strong>
+
+              <select
+                aria-label={`Stoc ${item.name}`}
+                value={item.stock}
+                onChange={(event) =>
+                  changeStock(
+                    item.id,
+                    event.target
+                      .value as PantryStock
+                  )
+                }
+              >
+                {(
+                  Object.keys(
+                    stockLabels
+                  ) as PantryStock[]
+                ).map((value) => (
+                  <option
+                    value={value}
+                    key={value}
+                  >
+                    {stockLabels[value]}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                className="danger"
+                onClick={() =>
+                  void save({
+                    pantry:
+                      data.pantry.filter(
+                        (entry) =>
+                          entry.id !==
+                          item.id
+                      ),
+                  })
+                }
+              >
+                Șterge
+              </button>
+            </div>
+          ))
+        ) : (
+          <EmptyState>
+            Cămara este goală.
+          </EmptyState>
+        )}
+      </section>
+    </>
+  )
 }

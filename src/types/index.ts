@@ -1,4 +1,8 @@
-export type Ingredient = { name: string; quantity: number; unit: string }
+export type Ingredient = {
+  name: string
+  quantity: number | null
+  unit: string | null
+}
 export type Recipe = { id: string; name: string; description: string; category: string; image_url: string | null; servings: number; calories: number; protein: number; carbs: number; fat: number; ingredients: Ingredient[]; steps: string[] }
 export type PantryStock = 'low' | 'medium' | 'enough'
 export type PantryItem = { id: string; name: string; stock: PantryStock }
